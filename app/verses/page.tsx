@@ -1,6 +1,23 @@
+"use client";
+
+import { useState } from "react";
 import { redCycle } from "@/data/redCycle";
 
 export default function VersesPage() {
+  const [selectedVerses, setSelectedVerses] = useState<number[]>([]);
+
+  function toggleVerse(number: number) {
+    setSelectedVerses((current) =>
+      current.includes(number)
+        ? current.filter((item) => item !== number)
+        : [...current, number]
+    );
+  }
+
+  function selectAll() {
+    setSelectedVerses(redCycle.map((verse) => verse.number));
+  }
+
   return (
     <main className="min-h-screen p-8">
       <h1 className="text-3xl font-bold mb-6">
@@ -11,6 +28,17 @@ export default function VersesPage() {
         Red Cycle - King James Version
       </h2>
 
+      <p className="mb-4">
+        Selected: {selectedVerses.length} of {redCycle.length}
+      </p>
+
+      <button
+        onClick={selectAll}
+        className="mb-6 rounded-lg bg-black px-4 py-2 text-white"
+      >
+        Select All
+      </button>
+
       <div className="flex flex-col gap-3">
         {redCycle.map((verse) => (
           <label
@@ -19,6 +47,8 @@ export default function VersesPage() {
           >
             <input
               type="checkbox"
+              checked={selectedVerses.includes(verse.number)}
+              onChange={() => toggleVerse(verse.number)}
               className="h-5 w-5"
             />
 
