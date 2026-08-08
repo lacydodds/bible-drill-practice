@@ -17,6 +17,7 @@ const selectedNumbers = searchParams
 const practiceVerses = redCycle.filter((verse) =>
   selectedNumbers.includes(verse.number)
 );
+const [mode, setMode] = useState<"study" | "test">("study");
   const [currentVerse, setCurrentVerse] = useState(0);
 
   function nextVerse() {
@@ -35,11 +36,39 @@ const practiceVerses = redCycle.filter((verse) =>
         <p className="mt-4 text-center text-lg text-gray-800">
           ⭐ Verse {currentVerse + 1} of {practiceVerses.length}
         </p>
+        <div className="mt-6 flex gap-3 justify-center">
+  <button
+    onClick={() => setMode("study")}
+    className={`rounded-xl px-4 py-3 font-bold ${
+      mode === "study"
+        ? "bg-blue-600 text-white"
+        : "bg-gray-200 text-gray-900"
+    }`}
+  >
+    📚 Study Mode
+  </button>
 
+  <button
+    onClick={() => setMode("test")}
+    className={`rounded-xl px-4 py-3 font-bold ${
+      mode === "test"
+        ? "bg-purple-600 text-white"
+        : "bg-gray-200 text-gray-900"
+    }`}
+  >
+    🏆 Test Me
+  </button>
+</div>
         <div className="mt-8 rounded-xl bg-yellow-200 p-6 text-center">
   <h2 className="text-2xl font-bold text-gray-900">
     {practiceVerses[currentVerse]?.reference}
   </h2>
+
+  {mode === "study" && (
+  <p className="mt-4 text-lg font-semibold text-gray-900">
+    {practiceVerses[currentVerse]?.text}
+  </p>
+)}
 </div>
 
         <p className="mt-6 text-center text-lg font-semibold text-gray-900">
