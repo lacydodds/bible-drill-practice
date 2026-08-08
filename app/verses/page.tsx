@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { redCycle } from "@/data/redCycle";
 
 export default function VersesPage() {
   const [selectedVerses, setSelectedVerses] = useState<number[]>([]);
-
+  const router = useRouter();
   function toggleVerse(number: number) {
     setSelectedVerses((current) =>
       current.includes(number)
@@ -38,7 +39,15 @@ export default function VersesPage() {
       >
         Select All
       </button>
-
+      
+      <button
+  onClick={() =>
+  router.push(`/practice?verses=${selectedVerses.join(",")}`)
+}
+  className="mb-6 rounded-lg bg-green-600 px-4 py-2 text-white font-bold"
+>
+  ▶️ Start Practice ({selectedVerses.length})
+</button>
       <div className="flex flex-col gap-3">
         {redCycle.map((verse) => (
           <label

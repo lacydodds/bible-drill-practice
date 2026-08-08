@@ -1,14 +1,22 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { redCycle } from "@/data/redCycle";
 
-const practiceVerses = [
-  "Genesis 1:27",
-  "Leviticus 22:31",
-  "Deuteronomy 6:5",
-];
 
 export default function PracticePage() {
+  const searchParams = useSearchParams();
+
+const selectedNumbers = searchParams
+  .get("verses")
+  ?.split(",")
+  .map(Number)
+  .filter(Boolean) ?? [];
+  
+const practiceVerses = redCycle.filter((verse) =>
+  selectedNumbers.includes(verse.number)
+);
   const [currentVerse, setCurrentVerse] = useState(0);
 
   function nextVerse() {
@@ -30,7 +38,7 @@ export default function PracticePage() {
 
         <div className="mt-8 rounded-xl bg-yellow-200 p-6 text-center">
   <h2 className="text-2xl font-bold text-gray-900">
-    {practiceVerses[currentVerse]}
+    {practiceVerses[currentVerse]?.reference}
   </h2>
 </div>
 
