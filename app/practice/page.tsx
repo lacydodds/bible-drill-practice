@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { redCycle } from "@/data/redCycle";
 
@@ -483,7 +483,7 @@ function getLearningRoundCount(
    Practice Page
 -------------------------------- */
 
-export default function PracticePage() {
+function PracticeContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -1623,5 +1623,23 @@ function shuffleArray<T>(array: T[]): T[] {
   }
 
   return shuffled;
+}
+
+export default function PracticePage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-white p-4">
+          <div className="mx-auto max-w-3xl">
+            <p className="text-center text-gray-700">
+              Loading Bible Drill...
+            </p>
+          </div>
+        </main>
+      }
+    >
+      <PracticeContent />
+    </Suspense>
+  );
 }
 
