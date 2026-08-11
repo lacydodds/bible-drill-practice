@@ -12,33 +12,42 @@ import {
 } from "next/navigation";
 import { redCycle } from "@/data/redCycle";
 
-interface SpeechRecognitionAlternative {
+/* --------------------------------
+Speech recognition types
+
+These are intentionally local types.
+We do NOT declare SpeechRecognition
+globally because newer TypeScript DOM
+libraries already provide those names.
+-------------------------------- */
+
+interface SpeechRecognitionAlternativeLike {
   transcript: string;
   confidence: number;
 }
 
-interface SpeechRecognitionResult {
+interface SpeechRecognitionResultLike {
   readonly isFinal: boolean;
   readonly length: number;
-  [index: number]: SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternativeLike;
 }
 
-interface SpeechRecognitionResultList {
+interface SpeechRecognitionResultListLike {
   readonly length: number;
-  [index: number]: SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResultLike;
 }
 
-interface SpeechRecognitionEvent extends Event {
-  results: SpeechRecognitionResultList;
+interface SpeechRecognitionEventLike extends Event {
+  results: SpeechRecognitionResultListLike;
   resultIndex: number;
 }
 
-interface SpeechRecognitionErrorEvent extends Event {
+interface SpeechRecognitionErrorEventLike extends Event {
   error: string;
   message?: string;
 }
 
-interface SpeechRecognitionInstance {
+interface SpeechRecognitionInstanceLike {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
@@ -46,23 +55,21 @@ interface SpeechRecognitionInstance {
   stop: () => void;
   abort: () => void;
   onresult:
-    | ((event: SpeechRecognitionEvent) => void)
+    | ((event: SpeechRecognitionEventLike) => void)
     | null;
   onend: (() => void) | null;
   onerror:
-    | ((event: SpeechRecognitionErrorEvent) => void)
+    | ((event: SpeechRecognitionErrorEventLike) => void)
     | null;
 }
 
-interface SpeechRecognitionConstructor {
-  new (): SpeechRecognitionInstance;
+interface SpeechRecognitionConstructorLike {
+  new (): SpeechRecognitionInstanceLike;
 }
 
-declare global {
-  interface Window {
-    SpeechRecognition?: SpeechRecognitionConstructor;
-    webkitSpeechRecognition?: SpeechRecognitionConstructor;
-  }
+interface SpeechRecognitionWindowLike {
+  SpeechRecognition?: SpeechRecognitionConstructorLike;
+  webkitSpeechRecognition?: SpeechRecognitionConstructorLike;
 }
 
 type WordStatus =
@@ -235,33 +242,6 @@ function normalizeSpeechWords(
 
 /* --------------------------------
 Mobile speech handling
-
-Mobile browsers sometimes return:
-
-"so"
-"so God"
-"so God created"
-"so God created man"
-
-instead of giving us only the new words.
-
-This function finds the largest overlap
-between the end of what we already have
-and the beginning of the new result.
-
-Example:
-
-Existing:
-"so God created"
-
-New result:
-"God created man"
-
-Overlap:
-"God created"
-
-Result:
-"so God created man"
 -------------------------------- */
 
 function appendNewSpeech(
@@ -282,11 +262,6 @@ function appendNewSpeech(
     return incomingWords.join(" ");
   }
 
-  /*
-   * If the incoming speech is already
-   * completely contained at the end,
-   * don't add it again.
-   */
   const existingNormalized =
     existingWords.map(normalizeWord);
 
@@ -320,10 +295,6 @@ function appendNewSpeech(
     }
   }
 
-  /*
-   * Add only the portion that hasn't
-   * already been heard.
-   */
   const newWords =
     incomingWords.slice(bestOverlap);
 
@@ -357,15 +328,6 @@ function cleanSpeechTranscript(
     const normalized =
       normalizeWord(word);
 
-    /*
-     * Ignore immediately repeated words.
-     *
-     * Example:
-     * "so so God"
-     *
-     * becomes:
-     * "so God"
-     */
     if (
       cleaned.length > 0 &&
       normalizeWord(
@@ -792,20 +754,13 @@ function PracticeContent() {
   ] = useState(false);
 
   const recognitionRef =
-    useRef<SpeechRecognitionInstance | null>(
+    useRef<SpeechRecognitionInstanceLike | null>(
       null
     );
 
-  /*
-   * Stores only finalized speech.
-   */
   const finalTranscriptRef =
     useRef("");
 
-  /*
-   * Stores the current interim result.
-   * This is NOT permanently appended.
-   */
   const interimTranscriptRef =
     useRef("");
 
@@ -833,10 +788,6 @@ function PracticeContent() {
     setLearningMastered(false);
     setLearningRoundPassed(false);
 
-    /*
-     * Clean up speech recognition if the
-     * selected verses/mode changes.
-     */
     return () => {
       if (recognitionRef.current) {
         try {
@@ -883,9 +834,12 @@ function PracticeContent() {
   }
 
   function startListening() {
+    const speechWindow =
+      window as unknown as SpeechRecognitionWindowLike;
+
     const SpeechRecognition =
-      window.SpeechRecognition ||
-      window.webkitSpeechRecognition;
+      speechWindow.SpeechRecognition ||
+      speechWindow.webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
       alert(
@@ -912,11 +866,6 @@ function PracticeContent() {
     const recognition =
       new SpeechRecognition();
 
-    /*
-     * Continuous mode lets the child quote
-     * the entire verse without repeatedly
-     * pressing the microphone.
-     */
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = "en-US";
@@ -926,31 +875,16 @@ function PracticeContent() {
 
     setIsListening(true);
 
-    /*
-     * IMPORTANT:
-     * The microphone is already running
-     * before the countdown finishes.
-     */
     setCountdown("ready");
 
     recognition.onresult = (
-      event: SpeechRecognitionEvent
+      event: SpeechRecognitionEventLike
     ) => {
       let finalText =
         finalTranscriptRef.current;
 
       let interimText = "";
 
-      /*
-       * Mobile browsers can sometimes send
-       * the same finalized results again.
-       *
-       * We process only results beginning
-       * at resultIndex, then use
-       * appendNewSpeech() to prevent
-       * overlapping speech from being
-       * duplicated.
-       */
       for (
         let i = event.resultIndex;
         i < event.results.length;
@@ -982,16 +916,8 @@ function PracticeContent() {
           finalTranscriptRef.current =
             finalText;
 
-          /*
-           * A finalized result replaces
-           * the interim speech that led to it.
-           */
           interimText = "";
         } else {
-          /*
-           * Interim results may also be
-           * cumulative on mobile.
-           */
           interimText =
             appendNewSpeech(
               interimText,
@@ -1008,10 +934,6 @@ function PracticeContent() {
       interimTranscriptRef.current =
         interimText;
 
-      /*
-       * Display final speech plus only the
-       * genuinely new interim speech.
-       */
       const displayText =
         appendNewSpeech(
           finalTranscriptRef.current,
@@ -1026,9 +948,6 @@ function PracticeContent() {
     };
 
     recognition.onend = () => {
-      /*
-       * Do not erase the transcript.
-       */
       setIsListening(false);
       recognitionRef.current = null;
 
@@ -1043,12 +962,8 @@ function PracticeContent() {
     };
 
     recognition.onerror = (
-      event: SpeechRecognitionErrorEvent
+      event: SpeechRecognitionErrorEventLike
     ) => {
-      /*
-       * "no-speech" is not really an
-       * application error.
-       */
       if (
         event.error !== "no-speech"
       ) {
@@ -1068,16 +983,9 @@ function PracticeContent() {
     try {
       recognition.start();
     } catch {
-      /*
-       * Ignore duplicate start attempts.
-       */
+      // Ignore duplicate start attempts.
     }
 
-    /*
-     * Microphone is already listening here.
-     *
-     * After 800ms we show GO.
-     */
     readyTimerRef.current =
       setTimeout(() => {
         setCountdown("go");
@@ -1103,10 +1011,6 @@ function PracticeContent() {
     setIsListening(false);
     setCountdown(null);
 
-    /*
-     * Give the browser a moment to deliver
-     * the final speech result before grading.
-     */
     setTimeout(() => {
       if (!verse) {
         return;
@@ -1830,7 +1734,8 @@ function PracticeContent() {
                           key={index}
                           className="whitespace-nowrap rounded bg-orange-200 px-1 font-bold text-orange-900"
                         >
-                          +{result.spoken}
+                          +
+                          {result.spoken}
                         </span>
                       );
                     }
@@ -1985,7 +1890,8 @@ function PracticeContent() {
                           key={index}
                           className="whitespace-nowrap rounded bg-orange-200 px-1 font-bold text-orange-900"
                         >
-                          +{result.spoken}
+                          +
+                          {result.spoken}
                         </span>
                       );
                     }
@@ -2082,3 +1988,4 @@ export default function PracticePage() {
     </Suspense>
   );
 }
+
