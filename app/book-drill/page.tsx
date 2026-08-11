@@ -52,7 +52,7 @@ type BookResult = {
 function normalize(text: string): string {
   return text
     .toLowerCase()
-    .replace(/[.,!?;:'"-]/g, "")
+    .replace(/[.,!?;:'"–—-]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -64,81 +64,118 @@ function bookMatches(
   const normalizedSpoken = normalize(spoken);
   const normalizedCorrect = normalize(correct);
 
-  if (normalizedSpoken === normalizedCorrect) {
+  if (
+    normalizedSpoken.includes(
+      normalizedCorrect
+    )
+  ) {
     return true;
   }
 
-  const aliases: Record<string, string[]> = {
-    "1 samuel": ["first samuel", "one samuel"],
-    "2 samuel": ["second samuel", "two samuel"],
-    "1 kings": ["first kings", "one kings"],
-    "2 kings": ["second kings", "two kings"],
-    "1 chronicles": [
-      "first chronicles",
-      "one chronicles",
-    ],
-    "2 chronicles": [
-      "second chronicles",
-      "two chronicles",
-    ],
-    "1 corinthians": [
-      "first corinthians",
-      "one corinthians",
-    ],
-    "2 corinthians": [
-      "second corinthians",
-      "two corinthians",
-    ],
-    "1 thessalonians": [
-      "first thessalonians",
-      "one thessalonians",
-    ],
-    "2 thessalonians": [
-      "second thessalonians",
-      "two thessalonians",
-    ],
-    "1 timothy": [
-      "first timothy",
-      "one timothy",
-    ],
-    "2 timothy": [
-      "second timothy",
-      "two timothy",
-    ],
-    "1 peter": [
-      "first peter",
-      "one peter",
-    ],
-    "2 peter": [
-      "second peter",
-      "two peter",
-    ],
-    "1 john": [
-      "first john",
-      "one john",
-    ],
-    "2 john": [
-      "second john",
-      "two john",
-    ],
-    "3 john": [
-      "third john",
-      "three john",
-    ],
-  };
+const aliases: Record<string, string[]> = {
+  "1 samuel": [
+    "first samuel",
+    "one samuel",
+    "1st samuel",
+  ],
+  "2 samuel": [
+    "second samuel",
+    "two samuel",
+    "2nd samuel",
+  ],
+  "1 kings": [
+    "first kings",
+    "one kings",
+    "1st kings",
+  ],
+  "2 kings": [
+    "second kings",
+    "two kings",
+    "2nd kings",
+  ],
+  "1 chronicles": [
+    "first chronicles",
+    "one chronicles",
+    "1st chronicles",
+  ],
+  "2 chronicles": [
+    "second chronicles",
+    "two chronicles",
+    "2nd chronicles",
+  ],
+  "1 corinthians": [
+    "first corinthians",
+    "one corinthians",
+    "1st corinthians",
+  ],
+  "2 corinthians": [
+    "second corinthians",
+    "two corinthians",
+    "2nd corinthians",
+  ],
+  "1 thessalonians": [
+    "first thessalonians",
+    "one thessalonians",
+    "1st thessalonians",
+  ],
+  "2 thessalonians": [
+    "second thessalonians",
+    "two thessalonians",
+    "2nd thessalonians",
+  ],
+  "1 timothy": [
+    "first timothy",
+    "one timothy",
+    "1st timothy",
+  ],
+  "2 timothy": [
+    "second timothy",
+    "two timothy",
+    "2nd timothy",
+  ],
+  "1 peter": [
+    "first peter",
+    "one peter",
+    "1st peter",
+  ],
+  "2 peter": [
+    "second peter",
+    "two peter",
+    "2nd peter",
+  ],
+  "1 john": [
+    "first john",
+    "one john",
+    "1st john",
+  ],
+  "2 john": [
+    "second john",
+    "two john",
+    "2nd john",
+  ],
+  "3 john": [
+    "third john",
+    "three john",
+    "3rd john",
+  ],
+};
 
   const possibleAliases =
-    aliases[normalizedCorrect] ?? [];
+  aliases[normalizedCorrect] ?? [];
 
-  return possibleAliases.includes(
-    normalizedSpoken
-  );
+if (
+  normalizedSpoken.includes(
+    normalizedCorrect
+  )
+) {
+  return true;
 }
 
-function shuffleBookIndex(): number {
-  return Math.floor(
-    Math.random() * bibleBooks.length
-  );
+return possibleAliases.some((alias) =>
+  normalizedSpoken.includes(
+    normalize(alias)
+  )
+);
 }
 
 function playDing() {
@@ -160,7 +197,8 @@ function playDing() {
     const oscillator =
       context.createOscillator();
 
-    const gain = context.createGain();
+    const gain =
+      context.createGain();
 
     oscillator.type = "sine";
 
@@ -241,7 +279,22 @@ export default function BookDrillPage() {
       null
     );
 
-  const transcriptRef =
+  /*
+   * IMPORTANT:
+   *
+   * finalTranscript contains only speech that
+   * the browser has finalized.
+   *
+   * interimTranscript contains the temporary
+   * speech the browser is still processing.
+   *
+   * We NEVER put interim results into the
+   * permanent transcript.
+   */
+  const finalTranscriptRef =
+    useRef("");
+
+  const interimTranscriptRef =
     useRef("");
 
   const currentBookIndexRef =
@@ -279,7 +332,9 @@ export default function BookDrillPage() {
     }
 
     if (phaseTimerRef.current) {
-      clearTimeout(phaseTimerRef.current);
+      clearTimeout(
+        phaseTimerRef.current
+      );
       phaseTimerRef.current = null;
     }
 
@@ -313,6 +368,28 @@ export default function BookDrillPage() {
     );
   }
 
+  /*
+   * Returns the clean speech currently available.
+   *
+   * Final speech is permanent.
+   * Interim speech is only temporary.
+   */
+  function getDisplayedTranscript() {
+    const finalText =
+      finalTranscriptRef.current.trim();
+
+    const interimText =
+      interimTranscriptRef.current.trim();
+
+    return [finalText, interimText]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+  }
+
+  /*
+   * YES / NO LISTENING
+   */
   function startYesNoListening() {
     const SpeechRecognition =
       getSpeechRecognition();
@@ -326,7 +403,9 @@ export default function BookDrillPage() {
 
     stopRecognition();
 
-    transcriptRef.current = "";
+    finalTranscriptRef.current = "";
+    interimTranscriptRef.current = "";
+
     yesNoHandledRef.current = false;
 
     const recognition =
@@ -345,26 +424,58 @@ export default function BookDrillPage() {
     recognition.onresult = (
       event: SpeechRecognitionEvent
     ) => {
-      let transcript = "";
+      let finalText = "";
+      let interimText = "";
 
       for (
         let i = 0;
         i < event.results.length;
         i++
       ) {
-        transcript +=
-          event.results[i][0].transcript +
-          " ";
+        const transcript =
+          event.results[i][0].transcript;
+
+        if (
+          event.results[i].isFinal
+        ) {
+          finalText +=
+            transcript + " ";
+        } else {
+          interimText +=
+            transcript + " ";
+        }
       }
 
-      const cleaned =
-        transcript.trim();
+      /*
+       * Only finalized speech gets stored
+       * permanently.
+       */
+      if (finalText.trim()) {
+        finalTranscriptRef.current =
+          (
+            finalTranscriptRef.current +
+            " " +
+            finalText
+          )
+            .replace(/\s+/g, " ")
+            .trim();
+      }
 
-      transcriptRef.current = cleaned;
-      setSpokenText(cleaned);
+      interimTranscriptRef.current =
+        interimText.trim();
 
+      const displayed =
+        getDisplayedTranscript();
+
+      setSpokenText(displayed);
+
+      /*
+       * YES/NO should be detected from the
+       * current complete speech, including
+       * interim speech.
+       */
       const normalized =
-        normalize(cleaned);
+        normalize(displayed);
 
       const words =
         normalized.split(" ");
@@ -398,6 +509,7 @@ export default function BookDrillPage() {
 
         setStage("tryAgain");
         stageRef.current = "tryAgain";
+
         setSpokenText("");
 
         phaseTimerRef.current =
@@ -473,6 +585,9 @@ export default function BookDrillPage() {
     );
   }
 
+  /*
+   * THREE BOOKS LISTENING
+   */
   function beginThreeBookListening() {
     const SpeechRecognition =
       getSpeechRecognition();
@@ -486,7 +601,9 @@ export default function BookDrillPage() {
 
     stopRecognition();
 
-    transcriptRef.current = "";
+    finalTranscriptRef.current = "";
+    interimTranscriptRef.current = "";
+
     setSpokenText("");
 
     const recognition =
@@ -510,24 +627,52 @@ export default function BookDrillPage() {
     recognition.onresult = (
       event: SpeechRecognitionEvent
     ) => {
-      let transcript = "";
+      let finalText = "";
+      let interimText = "";
 
       for (
         let i = 0;
         i < event.results.length;
         i++
       ) {
-        transcript +=
-          event.results[i][0].transcript +
-          " ";
+        const transcript =
+          event.results[i][0].transcript;
+
+        if (
+          event.results[i].isFinal
+        ) {
+          finalText +=
+            transcript + " ";
+        } else {
+          interimText +=
+            transcript + " ";
+        }
       }
 
-      const cleaned =
-        transcript.trim();
+      /*
+       * Store ONLY final results.
+       */
+      if (finalText.trim()) {
+        finalTranscriptRef.current =
+          (
+            finalTranscriptRef.current +
+            " " +
+            finalText
+          )
+            .replace(/\s+/g, " ")
+            .trim();
+      }
 
-      transcriptRef.current = cleaned;
+      /*
+       * Interim speech is displayed but
+       * never permanently stored.
+       */
+      interimTranscriptRef.current =
+        interimText.trim();
 
-      setSpokenText(cleaned);
+      setSpokenText(
+        getDisplayedTranscript()
+      );
     };
 
     recognition.onend = () => {
@@ -591,12 +736,19 @@ export default function BookDrillPage() {
 
     setListening(false);
 
+    /*
+     * IMPORTANT:
+     *
+     * Judge only finalized speech.
+     * Do NOT judge the temporary interim
+     * result because it may be incomplete.
+     */
     judgeThreeBooks();
   }
 
   function judgeThreeBooks() {
     const spoken =
-      transcriptRef.current;
+      finalTranscriptRef.current.trim();
 
     const index =
       currentBookIndexRef.current;
@@ -627,29 +779,20 @@ export default function BookDrillPage() {
       normalize(spoken);
 
     const beforeCorrect = before
-      ? spokenNormalized.includes(
-          normalize(before)
-        ) ||
-        bookMatches(
+      ? bookMatches(
           spokenNormalized,
           before
         )
       : false;
 
     const currentCorrect =
-      spokenNormalized.includes(
-        normalize(current)
-      ) ||
       bookMatches(
         spokenNormalized,
         current
       );
 
     const afterCorrect = after
-      ? spokenNormalized.includes(
-          normalize(after)
-        ) ||
-        bookMatches(
+      ? bookMatches(
           spokenNormalized,
           after
         )
@@ -679,7 +822,9 @@ export default function BookDrillPage() {
     setBookResult(null);
     setCurrentBookIndex(null);
 
-    transcriptRef.current = "";
+    finalTranscriptRef.current = "";
+    interimTranscriptRef.current = "";
+
     yesNoHandledRef.current = false;
   }
 
@@ -691,9 +836,13 @@ export default function BookDrillPage() {
 
     const index =
       bookIndex ??
-      shuffleBookIndex();
+      Math.floor(
+        Math.random() *
+          bibleBooks.length
+      );
 
     setCurrentBookIndex(index);
+
     currentBookIndexRef.current =
       index;
 
@@ -702,28 +851,38 @@ export default function BookDrillPage() {
     setCountdown(null);
     setTimer(null);
 
-    transcriptRef.current = "";
+    finalTranscriptRef.current = "";
+    interimTranscriptRef.current = "";
+
     yesNoHandledRef.current = false;
 
-    // STEP 1: Attention
+    /*
+     * STEP 1: Attention
+     */
     setStage("attention");
     stageRef.current = "attention";
 
     phaseTimerRef.current =
       setTimeout(() => {
-        // STEP 2: Present Bibles
+        /*
+         * STEP 2: Present Bibles
+         */
         setStage("present");
         stageRef.current = "present";
 
         phaseTimerRef.current =
           setTimeout(() => {
-            // STEP 3: Show the book
+            /*
+             * STEP 3: Show the book
+             */
             setStage("showBook");
             stageRef.current = "showBook";
 
             phaseTimerRef.current =
               setTimeout(() => {
-                // STEP 4: Countdown
+                /*
+                 * STEP 4: Countdown
+                 */
                 startCountdown();
               }, 2000);
           }, 2000);
@@ -731,6 +890,14 @@ export default function BookDrillPage() {
   }
 
   function startCountdown() {
+    if (
+      countdownIntervalRef.current
+    ) {
+      clearInterval(
+        countdownIntervalRef.current
+      );
+    }
+
     let count = 3;
 
     setCountdown(count);
@@ -743,8 +910,13 @@ export default function BookDrillPage() {
 
         if (count > 0) {
           setCountdown(count);
-          return;
-        }
+
+        if (count === 1) {
+          startYesNoListening();
+      }
+
+  return;
+}
 
         if (
           countdownIntervalRef.current
@@ -764,6 +936,10 @@ export default function BookDrillPage() {
   }
 
   function beginTenSecondTimer() {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+
     let remaining = 10;
 
     setStage("timer");
@@ -801,10 +977,13 @@ export default function BookDrillPage() {
     stageRef.current = "yesno";
 
     setTimer(null);
+
+    finalTranscriptRef.current = "";
+    interimTranscriptRef.current = "";
+
     setSpokenText("");
 
-    // Microphone starts immediately.
-    startYesNoListening();
+    
   }
 
   function getBeforeBook() {
@@ -989,7 +1168,7 @@ export default function BookDrillPage() {
                     : "Microphone is off"}
                 </p>
 
-                <p className="mt-2 text-lg text-gray-900">
+                <p className="mt-2 min-h-7 text-lg text-gray-900">
                   {spokenText ||
                     "Say Yes or No"}
                 </p>

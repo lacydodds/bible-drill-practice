@@ -138,9 +138,7 @@ function passageNameMatches(
     aliases[correctNormalized] ?? [];
 
   return possibleAliases.some((alias) =>
-    spokenNormalized.includes(
-      normalize(alias)
-    )
+    spokenNormalized.includes(normalize(alias))
   );
 }
 
@@ -148,17 +146,10 @@ function referenceMatches(
   spoken: string,
   correct: string
 ): boolean {
-  const spokenNormalized =
-    normalizeReference(spoken);
+  const spokenNormalized = normalizeReference(spoken);
+  const correctNormalized = normalizeReference(correct);
 
-  const correctNormalized =
-    normalizeReference(correct);
-
-  if (
-    spokenNormalized.includes(
-      correctNormalized
-    )
-  ) {
+  if (spokenNormalized.includes(correctNormalized)) {
     return true;
   }
 
@@ -212,9 +203,7 @@ function referenceMatches(
     aliases[correctNormalized] ?? [];
 
   return possibleAliases.some((alias) =>
-    spokenNormalized.includes(
-      normalizeReference(alias)
-    )
+    spokenNormalized.includes(normalizeReference(alias))
   );
 }
 
@@ -228,20 +217,13 @@ function playDing() {
         }
       ).webkitAudioContext;
 
-    if (!AudioContextClass) {
-      return;
-    }
+    if (!AudioContextClass) return;
 
     const context = new AudioContextClass();
-
-    const oscillator =
-      context.createOscillator();
-
-    const gain =
-      context.createGain();
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
 
     oscillator.type = "sine";
-
     oscillator.frequency.setValueAtTime(
       880,
       context.currentTime
@@ -266,10 +248,7 @@ function playDing() {
     gain.connect(context.destination);
 
     oscillator.start();
-
-    oscillator.stop(
-      context.currentTime + 0.5
-    );
+    oscillator.stop(context.currentTime + 0.5);
   } catch {
     // Ignore audio errors.
   }
@@ -302,36 +281,27 @@ export default function KeyPassageDrillPage() {
     useState<PassageResult | null>(null);
 
   const recognitionRef =
-    useRef<SpeechRecognitionInstance | null>(
-      null
-    );
+    useRef<SpeechRecognitionInstance | null>(null);
 
   const timerRef =
-    useRef<ReturnType<typeof setInterval> | null>(
-      null
-    );
+    useRef<ReturnType<typeof setInterval> | null>(null);
 
   const phaseTimerRef =
-    useRef<ReturnType<typeof setTimeout> | null>(
-      null
-    );
+    useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const countdownTimerRef =
-    useRef<ReturnType<typeof setInterval> | null>(
-      null
-    );
+    useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const transcriptRef =
-    useRef("");
-
-  const yesNoHandledRef =
-    useRef(false);
-
-  const answerListeningRef =
-    useRef(false);
+  // IMPORTANT:
+  // Final speech is stored separately from interim speech.
+  const finalTranscriptRef = useRef("");
+  const interimTranscriptRef = useRef("");
 
   const currentPassageIndexRef =
     useRef<number | null>(null);
+
+  const yesNoHandledRef = useRef(false);
+  const answerListeningRef = useRef(false);
 
   useEffect(() => {
     currentPassageIndexRef.current =
@@ -357,9 +327,7 @@ export default function KeyPassageDrillPage() {
     }
 
     if (countdownTimerRef.current) {
-      clearInterval(
-        countdownTimerRef.current
-      );
+      clearInterval(countdownTimerRef.current);
       countdownTimerRef.current = null;
     }
   }
@@ -368,9 +336,7 @@ export default function KeyPassageDrillPage() {
     answerListeningRef.current = false;
     yesNoHandledRef.current = true;
 
-    const recognition =
-      recognitionRef.current;
-
+    const recognition = recognitionRef.current;
     recognitionRef.current = null;
 
     if (recognition) {
@@ -395,9 +361,7 @@ export default function KeyPassageDrillPage() {
   function togglePassage(index: number) {
     setSelectedPassages((current) =>
       current.includes(index)
-        ? current.filter(
-            (item) => item !== index
-          )
+        ? current.filter((item) => item !== index)
         : [...current, index]
     );
   }
@@ -434,7 +398,8 @@ export default function KeyPassageDrillPage() {
     setResult(null);
     setCurrentPassageIndex(null);
 
-    transcriptRef.current = "";
+    finalTranscriptRef.current = "";
+    interimTranscriptRef.current = "";
   }
 
   function createRecognition(
@@ -452,16 +417,53 @@ export default function KeyPassageDrillPage() {
       return null;
     }
 
-    const recognition =
-      new SpeechRecognition();
+    const recognition = new SpeechRecognition();
 
-    recognition.continuous =
-      continuous;
-
+    recognition.continuous = continuous;
     recognition.interimResults = true;
     recognition.lang = "en-US";
 
     return recognition;
+  }
+
+  function updateTranscript(
+    event: SpeechRecognitionEvent
+  ) {
+    let finalText = "";
+    let interimText = "";
+
+    for (
+      let i = 0;
+      i < event.results.length;
+      i++
+    ) {
+      const result = event.results[i];
+
+      if (result.isFinal) {
+        finalText += result[0].transcript + " ";
+      } else {
+        interimText += result[0].transcript + " ";
+      }
+    }
+
+    finalTranscriptRef.current =
+      finalText.trim();
+
+    interimTranscriptRef.current =
+      interimText.trim();
+
+    const combined =
+      [
+        finalTranscriptRef.current,
+        interimTranscriptRef.current,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+
+    setSpokenText(combined);
+
+    return combined;
   }
 
   function beginYesNoListening() {
@@ -474,56 +476,37 @@ export default function KeyPassageDrillPage() {
 
     if (!recognition) {
       setStage("answer");
+      beginAnswerListening();
       return;
     }
 
-    recognitionRef.current =
-      recognition;
+    recognitionRef.current = recognition;
 
-    transcriptRef.current = "";
+    finalTranscriptRef.current = "";
+    interimTranscriptRef.current = "";
 
     setSpokenText("");
 
     recognition.onresult = (
       event: SpeechRecognitionEvent
     ) => {
-      let transcript = "";
-
-      for (
-        let i = 0;
-        i < event.results.length;
-        i++
-      ) {
-        transcript +=
-          event.results[i][0].transcript +
-          " ";
-      }
-
-      const cleaned =
-        transcript.trim();
-
-      setSpokenText(cleaned);
-
-      transcriptRef.current =
-        cleaned;
+      const transcript =
+        updateTranscript(event);
 
       const normalized =
-        normalize(cleaned);
+        normalize(transcript);
 
-      const words =
-        normalized.split(" ");
+      const words = normalized.split(" ");
 
       if (
         !yesNoHandledRef.current &&
         words.includes("yes")
       ) {
-        yesNoHandledRef.current =
-          true;
+        yesNoHandledRef.current = true;
 
         stopRecognition();
 
         beginAnswerListening();
-
         return;
       }
 
@@ -531,14 +514,11 @@ export default function KeyPassageDrillPage() {
         !yesNoHandledRef.current &&
         words.includes("no")
       ) {
-        yesNoHandledRef.current =
-          true;
+        yesNoHandledRef.current = true;
 
         stopRecognition();
 
         retrySamePassage();
-
-        return;
       }
     };
 
@@ -548,9 +528,7 @@ export default function KeyPassageDrillPage() {
         stage === "yesno"
       ) {
         setTimeout(() => {
-          if (
-            !yesNoHandledRef.current
-          ) {
+          if (!yesNoHandledRef.current) {
             beginYesNoListening();
           }
         }, 200);
@@ -558,13 +536,9 @@ export default function KeyPassageDrillPage() {
     };
 
     recognition.onerror = () => {
-      if (
-        !yesNoHandledRef.current
-      ) {
+      if (!yesNoHandledRef.current) {
         setTimeout(() => {
-          if (
-            !yesNoHandledRef.current
-          ) {
+          if (!yesNoHandledRef.current) {
             beginYesNoListening();
           }
         }, 300);
@@ -580,13 +554,9 @@ export default function KeyPassageDrillPage() {
 
   function retrySamePassage() {
     clearTimers();
-
     stopRecognition();
 
-    setSpokenText(
-      "No — Let's try again!"
-    );
-
+    setSpokenText("No — Let's try again!");
     setStage("retry");
 
     phaseTimerRef.current =
@@ -613,50 +583,26 @@ export default function KeyPassageDrillPage() {
       return;
     }
 
-    recognitionRef.current =
-      recognition;
+    recognitionRef.current = recognition;
 
-    answerListeningRef.current =
-      true;
+    answerListeningRef.current = true;
 
-    transcriptRef.current = "";
+    finalTranscriptRef.current = "";
+    interimTranscriptRef.current = "";
 
     setSpokenText("");
-
     setStage("answer");
 
     recognition.onresult = (
       event: SpeechRecognitionEvent
     ) => {
-      let transcript = "";
-
-      for (
-        let i = 0;
-        i < event.results.length;
-        i++
-      ) {
-        transcript +=
-          event.results[i][0].transcript +
-          " ";
-      }
-
-      const cleaned =
-        transcript.trim();
-
-      transcriptRef.current =
-        cleaned;
-
-      setSpokenText(cleaned);
+      updateTranscript(event);
     };
 
     recognition.onend = () => {
-      if (
-        answerListeningRef.current
-      ) {
+      if (answerListeningRef.current) {
         setTimeout(() => {
-          if (
-            answerListeningRef.current
-          ) {
+          if (answerListeningRef.current) {
             try {
               recognition.start();
             } catch {
@@ -668,13 +614,9 @@ export default function KeyPassageDrillPage() {
     };
 
     recognition.onerror = () => {
-      if (
-        answerListeningRef.current
-      ) {
+      if (answerListeningRef.current) {
         setTimeout(() => {
-          if (
-            answerListeningRef.current
-          ) {
+          if (answerListeningRef.current) {
             try {
               recognition.start();
             } catch {
@@ -693,12 +635,9 @@ export default function KeyPassageDrillPage() {
   }
 
   function stopAnswerListening() {
-    answerListeningRef.current =
-      false;
+    answerListeningRef.current = false;
 
-    const recognition =
-      recognitionRef.current;
-
+    const recognition = recognitionRef.current;
     recognitionRef.current = null;
 
     if (recognition) {
@@ -714,7 +653,7 @@ export default function KeyPassageDrillPage() {
     }
 
     const spoken =
-      transcriptRef.current;
+      finalTranscriptRef.current.trim();
 
     const index =
       currentPassageIndexRef.current;
@@ -727,8 +666,7 @@ export default function KeyPassageDrillPage() {
       return;
     }
 
-    const passage =
-      keyPassages[index];
+    const passage = keyPassages[index];
 
     const nameCorrect =
       passageNameMatches(
@@ -759,9 +697,7 @@ export default function KeyPassageDrillPage() {
 
     let index: number;
 
-    if (
-      passageIndex !== undefined
-    ) {
+    if (passageIndex !== undefined) {
       index = passageIndex;
     } else {
       const randomPosition =
@@ -771,22 +707,20 @@ export default function KeyPassageDrillPage() {
         );
 
       index =
-        selectedPassages[
-          randomPosition
-        ];
+        selectedPassages[randomPosition];
     }
 
     setCurrentPassageIndex(index);
-
-    currentPassageIndexRef.current =
-      index;
+    currentPassageIndexRef.current = index;
 
     setSpokenText("");
     setResult(null);
     setCountdown(null);
     setTimer(null);
 
-    transcriptRef.current = "";
+    finalTranscriptRef.current = "";
+    interimTranscriptRef.current = "";
+
     yesNoHandledRef.current = false;
 
     setStage("attention");
@@ -809,9 +743,7 @@ export default function KeyPassageDrillPage() {
 
   function startCountdown() {
     if (countdownTimerRef.current) {
-      clearInterval(
-        countdownTimerRef.current
-      );
+      clearInterval(countdownTimerRef.current);
     }
 
     let count = 3;
@@ -828,15 +760,12 @@ export default function KeyPassageDrillPage() {
           return;
         }
 
-        if (
-          countdownTimerRef.current
-        ) {
+        if (countdownTimerRef.current) {
           clearInterval(
             countdownTimerRef.current
           );
 
-          countdownTimerRef.current =
-            null;
+          countdownTimerRef.current = null;
         }
 
         setCountdown(null);
@@ -865,10 +794,7 @@ export default function KeyPassageDrillPage() {
         }
 
         if (timerRef.current) {
-          clearInterval(
-            timerRef.current
-          );
-
+          clearInterval(timerRef.current);
           timerRef.current = null;
         }
 
@@ -890,15 +816,12 @@ export default function KeyPassageDrillPage() {
 
   const currentPassage =
     currentPassageIndex !== null
-      ? keyPassages[
-          currentPassageIndex
-        ]
+      ? keyPassages[currentPassageIndex]
       : null;
 
   return (
     <main className="min-h-screen bg-white px-4 py-6">
       <div className="mx-auto max-w-2xl">
-        {/* Header */}
         <div className="text-center">
           <h1 className="text-3xl font-bold text-gray-900">
             📖 Bible Drill
@@ -909,7 +832,6 @@ export default function KeyPassageDrillPage() {
           </p>
         </div>
 
-        {/* SELECT KEY PASSAGES */}
         {stage === "select" && (
           <>
             <div className="mt-5 flex justify-start">
@@ -933,18 +855,14 @@ export default function KeyPassageDrillPage() {
 
             <div className="mt-4 flex justify-center gap-2">
               <button
-                onClick={
-                  selectAllPassages
-                }
+                onClick={selectAllPassages}
                 className="rounded-lg bg-black px-4 py-2 text-sm font-bold text-white"
               >
                 Select All
               </button>
 
               <button
-                onClick={
-                  clearAllPassages
-                }
+                onClick={clearAllPassages}
                 className="rounded-lg bg-gray-300 px-4 py-2 text-sm font-bold text-gray-900"
               >
                 Clear All
@@ -955,9 +873,7 @@ export default function KeyPassageDrillPage() {
               {keyPassages.map(
                 (passage, index) => {
                   const selected =
-                    selectedPassages.includes(
-                      index
-                    );
+                    selectedPassages.includes(index);
 
                   return (
                     <label
@@ -972,9 +888,7 @@ export default function KeyPassageDrillPage() {
                         type="checkbox"
                         checked={selected}
                         onChange={() =>
-                          togglePassage(
-                            index
-                          )
+                          togglePassage(index)
                         }
                         className="h-4 w-4 shrink-0"
                       />
@@ -989,9 +903,7 @@ export default function KeyPassageDrillPage() {
             </div>
 
             <button
-              onClick={
-                startSelectedDrill
-              }
+              onClick={startSelectedDrill}
               className="mt-5 w-full rounded-xl bg-blue-600 px-4 py-4 text-lg font-bold text-white"
             >
               ▶️ Start Key Passage Drill
@@ -999,7 +911,6 @@ export default function KeyPassageDrillPage() {
           </>
         )}
 
-        {/* IDLE */}
         {stage === "idle" && (
           <>
             <button
@@ -1011,8 +922,7 @@ export default function KeyPassageDrillPage() {
 
             <div className="mt-8 text-center">
               <p className="text-lg text-gray-700">
-                You will be given a key
-                passage.
+                You will be given a key passage.
               </p>
 
               <p className="mt-3 text-lg text-gray-700">
@@ -1023,16 +933,13 @@ export default function KeyPassageDrillPage() {
               <p className="mt-3 text-sm font-semibold text-blue-700">
                 {selectedPassages.length}{" "}
                 passage
-                {selectedPassages.length ===
-                1
+                {selectedPassages.length === 1
                   ? ""
                   : "s"} selected
               </p>
 
               <button
-                onClick={() =>
-                  startSequence()
-                }
+                onClick={() => startSequence()}
                 className="mt-8 w-full rounded-xl bg-blue-600 px-4 py-5 text-xl font-bold text-white"
               >
                 ▶️ Start Key Passage Drill
@@ -1041,7 +948,6 @@ export default function KeyPassageDrillPage() {
           </>
         )}
 
-        {/* ATTENTION */}
         {stage === "attention" && (
           <div className="mt-12 rounded-2xl bg-blue-50 p-10 text-center">
             <p className="text-5xl font-bold text-blue-700">
@@ -1050,7 +956,6 @@ export default function KeyPassageDrillPage() {
           </div>
         )}
 
-        {/* PRESENT BIBLES */}
         {stage === "present" && (
           <div className="mt-12 rounded-2xl bg-green-50 p-10 text-center">
             <p className="text-5xl font-bold text-green-700">
@@ -1059,7 +964,6 @@ export default function KeyPassageDrillPage() {
           </div>
         )}
 
-        {/* PASSAGE */}
         {stage === "passage" &&
           currentPassage && (
             <div className="mt-12 rounded-2xl bg-purple-50 p-10 text-center">
@@ -1073,7 +977,6 @@ export default function KeyPassageDrillPage() {
             </div>
           )}
 
-        {/* COUNTDOWN */}
         {stage === "countdown" && (
           <div className="mt-12 rounded-2xl bg-blue-50 p-10 text-center">
             <p className="text-2xl font-bold text-gray-900">
@@ -1086,7 +989,6 @@ export default function KeyPassageDrillPage() {
           </div>
         )}
 
-        {/* TIMER */}
         {stage === "timer" &&
           currentPassage && (
             <div className="mt-8 text-center">
@@ -1110,7 +1012,6 @@ export default function KeyPassageDrillPage() {
             </div>
           )}
 
-        {/* YES / NO */}
         {stage === "yesno" && (
           <div className="mt-8 text-center">
             <div className="rounded-2xl bg-yellow-50 p-7">
@@ -1123,9 +1024,7 @@ export default function KeyPassageDrillPage() {
               </p>
 
               <p className="mt-4 text-lg text-gray-700">
-                Say{" "}
-                <strong>"Yes"</strong>{" "}
-                or{" "}
+                Say <strong>"Yes"</strong> or{" "}
                 <strong>"No"</strong>.
               </p>
 
@@ -1135,15 +1034,13 @@ export default function KeyPassageDrillPage() {
                 </p>
 
                 <p className="mt-2 min-h-7 text-lg text-gray-900">
-                  {spokenText ||
-                    "Say Yes or No"}
+                  {spokenText || "Say Yes or No"}
                 </p>
               </div>
             </div>
           </div>
         )}
 
-        {/* RETRY */}
         {stage === "retry" && (
           <div className="mt-12 rounded-2xl bg-yellow-50 p-10 text-center">
             <p className="text-5xl font-bold text-orange-600">
@@ -1156,7 +1053,6 @@ export default function KeyPassageDrillPage() {
           </div>
         )}
 
-        {/* ANSWER */}
         {stage === "answer" &&
           currentPassage && (
             <div className="mt-8 text-center">
@@ -1183,9 +1079,7 @@ export default function KeyPassageDrillPage() {
                 </div>
 
                 <button
-                  onClick={
-                    stopAnswerListening
-                  }
+                  onClick={stopAnswerListening}
                   className="mt-6 w-full rounded-xl bg-red-600 px-4 py-4 text-lg font-bold text-white"
                 >
                   🛑 Stop Listening
@@ -1194,7 +1088,6 @@ export default function KeyPassageDrillPage() {
             </div>
           )}
 
-        {/* RESULT */}
         {stage === "result" &&
           result &&
           currentPassage && (
@@ -1222,9 +1115,7 @@ export default function KeyPassageDrillPage() {
                         : "text-red-700"
                     }
                   >
-                    {result.nameCorrect
-                      ? "✅"
-                      : "❌"}{" "}
+                    {result.nameCorrect ? "✅" : "❌"}{" "}
                     Passage Name:{" "}
                     <strong>
                       {currentPassage.name}
@@ -1262,9 +1153,7 @@ export default function KeyPassageDrillPage() {
               </div>
 
               <button
-                onClick={() =>
-                  startSequence()
-                }
+                onClick={() => startSequence()}
                 className="mt-5 w-full rounded-xl bg-green-600 px-4 py-4 text-lg font-bold text-white"
               >
                 🔄 Try Another Key Passage
@@ -1279,7 +1168,6 @@ export default function KeyPassageDrillPage() {
             </div>
           )}
 
-        {/* CANCEL DRILL */}
         {stage !== "select" &&
           stage !== "idle" &&
           stage !== "result" && (
