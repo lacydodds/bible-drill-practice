@@ -795,6 +795,11 @@ function PracticeContent() {
     setLearningRoundPassed,
   ] = useState(false);
 
+  const [
+    manualAccepted,
+    setManualAccepted,
+  ] = useState(false);
+
   const recognitionRef =
     useRef<AppSpeechRecognition | null>(
       null
@@ -842,6 +847,7 @@ function PracticeContent() {
     setLearningAttempts(0);
     setLearningMastered(false);
     setLearningRoundPassed(false);
+    setManualAccepted(false);
 
     return () => {
       shouldKeepListeningRef.current =
@@ -1128,6 +1134,7 @@ function PracticeContent() {
     setWordResults([]);
     setScore(null);
     setLearningRoundPassed(false);
+    setManualAccepted(false);
 
     finalTranscriptRef.current = "";
 
@@ -1235,6 +1242,46 @@ function PracticeContent() {
     }
   }
 
+  function acceptRecognitionMiss() {
+    if (!score || !verse) {
+      return;
+    }
+
+    setManualAccepted(true);
+
+    /*
+     * Keep the microphone's score and
+     * transcript visible, but allow the
+     * child to move forward when they know
+     * the browser failed to capture words
+     * they actually said.
+     */
+    if (mode === "study") {
+      setLearningRoundPassed(true);
+
+      const completeVerse =
+        `${verse.text} ${verse.reference}`;
+
+      const wordCount =
+        completeVerse
+          .split(/\s+/)
+          .filter(Boolean)
+          .length;
+
+      const totalRounds =
+        getLearningRoundCount(
+          wordCount
+        );
+
+      if (
+        learningRound >=
+        totalRounds - 1
+      ) {
+        setLearningMastered(true);
+      }
+    }
+  }
+
   function stopListening() {
     shouldKeepListeningRef.current =
       false;
@@ -1282,6 +1329,7 @@ function PracticeContent() {
     setWordResults([]);
     setScore(null);
     setLearningRoundPassed(false);
+    setManualAccepted(false);
 
     finalTranscriptRef.current = "";
   }
@@ -1325,6 +1373,7 @@ function PracticeContent() {
     setWordResults([]);
     setScore(null);
     setLearningRoundPassed(false);
+    setManualAccepted(false);
 
     finalTranscriptRef.current = "";
   }
@@ -1342,6 +1391,7 @@ function PracticeContent() {
     setLearningAttempts(0);
     setLearningMastered(false);
     setLearningRoundPassed(false);
+    setManualAccepted(false);
 
     finalTranscriptRef.current = "";
 
@@ -1619,13 +1669,15 @@ function PracticeContent() {
                   }`}
                 >
                   <p className="text-center text-lg font-bold text-gray-900">
-                    {learningRoundPassed
+                    {manualAccepted
+                      ? "✅ Marked Correct — Microphone Missed Me"
+                      : learningRoundPassed
                       ? "🎉 Great Job!"
                       : "💪 Let's Practice This One Again"}
                   </p>
 
                   <p className="mt-0.5 text-center text-sm font-semibold text-gray-900">
-                    {score.percentage}% correct
+                    {score.percentage}% microphone score
                   </p>
 
                   <div className="mt-2 flex justify-center gap-6 text-center">
@@ -1694,6 +1746,24 @@ function PracticeContent() {
                       </button>
                     )}
                   </div>
+
+                  {!learningRoundPassed &&
+                    !manualAccepted &&
+                    (score.missed > 0 ||
+                      score.extra > 0) && (
+                      <button
+                        onClick={acceptRecognitionMiss}
+                        className="mt-2 w-full rounded-xl bg-green-700 px-3 py-2.5 text-xs font-bold text-white"
+                      >
+                        ✅ I Said It Correctly — Microphone Missed Me
+                      </button>
+                    )}
+
+                  {manualAccepted && (
+                    <p className="mt-2 rounded-lg bg-white px-3 py-2 text-center text-xs font-semibold text-green-800">
+                      This round will count as correct. The microphone score above is still shown for reference.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -1811,6 +1881,7 @@ function PracticeContent() {
                   setLearningAttempts(0);
                   setLearningMastered(false);
                   setLearningRoundPassed(false);
+                  setManualAccepted(false);
                   setSpokenText("");
                   setWordResults([]);
                   setScore(null);
@@ -1847,7 +1918,9 @@ function PracticeContent() {
           {score && (
             <div className="mt-2 rounded-xl bg-green-50 px-3 py-2">
               <p className="text-center text-base font-bold text-green-700">
-                {score.percentage >= 90
+                {manualAccepted
+                  ? "✅ Marked Correct — Microphone Missed Me"
+                  : score.percentage >= 90
                   ? "🎉 Great Job!"
                   : score.percentage >= 75
                   ? "👍 Good Job!"
@@ -1855,8 +1928,25 @@ function PracticeContent() {
               </p>
 
               <p className="text-center text-sm font-semibold text-gray-900">
-                {score.percentage}% correct
+                {score.percentage}% microphone score
               </p>
+
+              {!manualAccepted &&
+                (score.missed > 0 ||
+                  score.extra > 0) && (
+                  <button
+                    onClick={acceptRecognitionMiss}
+                    className="mt-2 w-full rounded-xl bg-green-700 px-3 py-2.5 text-xs font-bold text-white"
+                  >
+                    ✅ I Said It Correctly — Microphone Missed Me
+                  </button>
+                )}
+
+              {manualAccepted && (
+                <p className="mt-2 rounded-lg bg-white px-3 py-2 text-center text-xs font-semibold text-green-800">
+                  Marked correct by you. The microphone score is still shown for reference.
+                </p>
+              )}
             </div>
           )}
 
@@ -1954,7 +2044,9 @@ function PracticeContent() {
           {score && (
             <div className="mt-2 rounded-xl bg-green-50 px-3 py-2">
               <p className="text-center text-base font-bold text-green-700">
-                {score.percentage >= 90
+                {manualAccepted
+                  ? "✅ Marked Correct — Microphone Missed Me"
+                  : score.percentage >= 90
                   ? "🎉 Great Job!"
                   : score.percentage >= 75
                   ? "👍 Good Job!"
@@ -1962,8 +2054,25 @@ function PracticeContent() {
               </p>
 
               <p className="text-center text-sm font-semibold text-gray-900">
-                {score.percentage}% correct
+                {score.percentage}% microphone score
               </p>
+
+              {!manualAccepted &&
+                (score.missed > 0 ||
+                  score.extra > 0) && (
+                  <button
+                    onClick={acceptRecognitionMiss}
+                    className="mt-2 w-full rounded-xl bg-green-700 px-3 py-2.5 text-xs font-bold text-white"
+                  >
+                    ✅ I Said It Correctly — Microphone Missed Me
+                  </button>
+                )}
+
+              {manualAccepted && (
+                <p className="mt-2 rounded-lg bg-white px-3 py-2 text-center text-xs font-semibold text-green-800">
+                  Marked correct by you. The microphone score is still shown for reference.
+                </p>
+              )}
             </div>
           )}
 
